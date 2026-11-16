@@ -1,4 +1,10 @@
-"""Builds the Further Maths Statistics workbook PDF from the unit modules in content/."""
+"""Builds a workbook PDF from unit modules.
+
+Usage: python build_workbook.py [stats|pure]   (default stats)
+  stats -> units in content/, writes ../Further_Statistics_Workbook.pdf (with statistical tables)
+  pure  -> units in pure/,    writes ../Further_Pure_Workbook.pdf
+Figures referenced by units live in <package>/figures/.
+"""
 import importlib
 import re
 import sys
@@ -13,13 +19,19 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    CondPageBreak, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+    CondPageBreak, Image, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
 )
 from reportlab.platypus.tableofcontents import TableOfContents
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parent / "Further_Statistics_Workbook.pdf"
 sys.path.insert(0, str(HERE))
+
+# book name -> (unit package, output file, include statistical tables)
+BOOKS = {
+    "stats": ("content", "Further_Statistics_Workbook.pdf", True),
+    "pure": ("pure", "Further_Pure_Workbook.pdf", False),
+}
+PACKAGE = "content"  # set by main(); used to locate figures
 
 import tables  # noqa: E402
 
@@ -60,17 +72,34 @@ S = {
     "tcellh": ParagraphStyle("tcellh", fontName="SansB", fontSize=6.8, leading=8.2, alignment=TA_CENTER),
     "toc0": ParagraphStyle("toc0", fontName="SansB", fontSize=11, leading=16, spaceBefore=6),
     "toc1": ParagraphStyle("toc1", fontName="Body", fontSize=10, leading=14, leftIndent=14),
+    "caption": ParagraphStyle("caption", fontName="Sans", fontSize=8.5, leading=11, alignment=TA_CENTER,
+                              textColor=colors.HexColor("#444444"), spaceAfter=8),
 }
 
 INLINE = {"<b>": "<b>", "</b>": "</b>", "<i>": "<i>", "</i>": "</i>",
           "<sub>": "<sub>", "</sub>": "</sub>", "<sup>": "<super>", "</sup>": "</super>"}
 
 
+def _cmap(file):
+    from fontTools.ttLib import TTFont as FTFont
+    return set(FTFont(str(FONT_DIR / file)).getBestCmap())
+
+
+SERIF_CHARS = _cmap("DejaVuSerif.ttf")
+SANS_CHARS = _cmap("DejaVuSans.ttf")
+
+
+def fallback(text):
+    """Draw characters the serif font lacks (e.g. ✓ ≅ ∎) with DejaVu Sans instead of a blank box."""
+    return "".join(f'<font name="Sans">{ch}</font>' if ord(ch) not in SERIF_CHARS and ord(ch) in SANS_CHARS
+                   else ch for ch in text)
+
+
 def esc(text):
     out = str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     for tag, repl in INLINE.items():
         out = out.replace(tag.replace("<", "&lt;").replace(">", "&gt;"), repl)
-    return out.replace("\n", "<br/>")
+    return fallback(out).replace("\n", "<br/>")
 
 
 def para(text, style="body"):
@@ -111,6 +140,20 @@ def split_parts(text):
     return PART_RE.sub(lambda m: f"\n({m.group(1)}) ", text)
 
 
+def figure(filename, caption="", width_mm=110):
+    """A centred figure from <package>/figures/, scaled to width_mm, with an optional caption."""
+    path = HERE / PACKAGE / "figures" / filename
+    if not path.exists():
+        raise FileNotFoundError(f"figure not found: {path}")
+    img = Image(str(path))
+    scale = width_mm * mm / img.imageWidth
+    img.drawWidth, img.drawHeight = img.imageWidth * scale, img.imageHeight * scale
+    flow = [img]
+    if caption:
+        flow.append(para(caption, "caption"))
+    return [KeepTogether(flow), Spacer(1, 4)]
+
+
 class Heading(Paragraph):
     """A heading that registers itself in the table of contents."""
 
@@ -141,6 +184,8 @@ def notes_flow(items):
                 first = WIDTH * 0.34
                 widths = [first] + [(WIDTH - first) / (n - 1)] * (n - 1)
             story += data_table(item[1], item[2], widths)
+        elif kind == "figure":
+            story += figure(*item[1:])
         else:
             raise ValueError(f"unknown note kind {kind}")
     return story
@@ -155,6 +200,8 @@ def build_unit(unit):
     for ex in unit["examples"]:
         flow = [para(f"<b>Worked example {unit['number']}.{unit['examples'].index(ex) + 1}: {ex['title']}</b>", "h2"),
                 para(ex["question"])]
+        if ex.get("figure"):
+            flow += figure(ex["figure"], ex.get("caption", ""), ex.get("width_mm", 100))
         flow += [para(s, "step") for s in ex["steps"]]
         story += [KeepTogether(flow), Spacer(1, 6)]
     story.append(PageBreak())
@@ -163,12 +210,16 @@ def build_unit(unit):
     story.append(para("Section A: skills practice", "h2"))
     for i, q in enumerate(unit["practice"], 1):
         story.append(Paragraph(esc(split_parts(q)), S["q"], bulletText=f"{unit['number']}.{i}"))
+        for fig in unit.get("practice_figures", {}).get(i, []):
+            story += figure(*fig)
     exam = unit.get("exam", [])
     if exam:
         story.append(para("Section B: exam-style questions", "h2"))
         start = len(unit["practice"])
         for j, q in enumerate(exam, start + 1):
             story.append(Paragraph(esc(split_parts(q)), S["q"], bulletText=f"{unit['number']}.{j}"))
+            for fig in unit.get("practice_figures", {}).get(j, []):
+                story += figure(*fig)
     story.append(PageBreak())
     return story
 
@@ -204,7 +255,11 @@ class Doc(SimpleDocTemplate):
 
 
 def main():
-    book = importlib.import_module("content.book")
+    global PACKAGE
+    name = sys.argv[1] if len(sys.argv) > 1 else "stats"
+    PACKAGE, out_name, with_tables = BOOKS[name]
+    out = HERE.parent / out_name
+    book = importlib.import_module(f"{PACKAGE}.book")
     toc = TableOfContents()
     toc.levelStyles = [S["toc0"], S["toc1"]]
 
@@ -221,7 +276,7 @@ def main():
     for part in book.PARTS:
         story += [Heading(part["title"], "part", 0), para(part["intro"], "subtitle"), PageBreak()]
         for name in part["units"]:
-            unit = importlib.import_module(f"content.{name}").UNIT
+            unit = importlib.import_module(f"{PACKAGE}.{name}").UNIT
             units.append(unit)
             story += build_unit(unit)
 
@@ -229,8 +284,9 @@ def main():
         story.append(Heading(section["title"], "h1", 0))
         story += notes_flow(section["notes"])
         story.append(PageBreak())
-    story += build_tables()
-    story.append(PageBreak())
+    if with_tables:
+        story += build_tables()
+        story.append(PageBreak())
     story += build_answers(units)
 
     def footer(canvas, doc):
@@ -240,10 +296,10 @@ def main():
         canvas.drawCentredString(A4[0] / 2, 11 * mm, f"{book.TITLE}  |  page {doc.page}")
         canvas.restoreState()
 
-    doc = Doc(str(OUT), pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm,
+    doc = Doc(str(out), pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm,
               topMargin=18 * mm, bottomMargin=18 * mm, title=book.TITLE, author="Further Maths")
     doc.multiBuild(story, onFirstPage=lambda c, d: None, onLaterPages=footer)
-    print("wrote", OUT)
+    print("wrote", out)
 
 
 if __name__ == "__main__":

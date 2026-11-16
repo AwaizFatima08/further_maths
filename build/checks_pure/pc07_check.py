@@ -1,0 +1,284 @@
+"""Checks every result stated in pure/pc07.py (Groups I) by brute force and with SymPy."""
+import itertools
+import re
+import sys
+from pathlib import Path
+
+import sympy as sp
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from pure.pc07 import D3, G4, M4, U5, U8, UNIT, Z6  # noqa: E402
+
+FAILS = []
+COUNT = 0
+
+
+def ok(label, cond):
+    global COUNT
+    COUNT += 1
+    print(("ok  " if cond else "FAIL"), label)
+    if not cond:
+        FAILS.append(label)
+
+
+# ---------- generic finite-group tools ----------
+def op_from_table(table):
+    els, rows = table
+    return els, {(a, b): rows[i][j] for i, a in enumerate(els) for j, b in enumerate(els)}
+
+
+def op_from_func(els, f):
+    return list(els), {(a, b): f(a, b) for a in els for b in els}
+
+
+def is_group(els, op):
+    if any(op[(a, b)] not in els for a in els for b in els):
+        return False, "closure"
+    if any(op[(op[(a, b)], c)] != op[(a, op[(b, c)])] for a in els for b in els for c in els):
+        return False, "assoc"
+    ids = [e for e in els if all(op[(e, a)] == a and op[(a, e)] == a for a in els)]
+    if len(ids) != 1:
+        return False, "identity"
+    e = ids[0]
+    if any(not any(op[(a, b)] == e and op[(b, a)] == e for b in els) for a in els):
+        return False, "inverse"
+    return True, e
+
+
+def identity(els, op):
+    return is_group(els, op)[1]
+
+
+def inverse(els, op, a):
+    e = identity(els, op)
+    return next(b for b in els if op[(a, b)] == e)
+
+
+def order(els, op, a):
+    e = identity(els, op)
+    x, n = a, 1
+    while x != e:
+        x, n = op[(x, a)], n + 1
+    return n
+
+
+def latin(els, op):
+    return all(sorted(op[(a, b)] for b in els) == sorted(els) and sorted(op[(b, a)] for b in els) == sorted(els)
+               for a in els)
+
+
+def abelian(els, op):
+    return all(op[(a, b)] == op[(b, a)] for a in els for b in els)
+
+
+def subgroups(els, op):
+    """All subgroups, by closure of every subset containing e (fine for orders up to 12)."""
+    e = identity(els, op)
+    others = [x for x in els if x != e]
+    out = []
+    for r in range(len(others) + 1):
+        for comb in itertools.combinations(others, r):
+            h = {e, *comb}
+            if all(op[(a, b)] in h for a in h for b in h):
+                out.append(frozenset(h))
+    return out
+
+
+def generated(els, op, gens):
+    h = set(gens)
+    while True:
+        new = {op[(a, b)] for a in h for b in h} | h
+        if new == h:
+            return h
+        h = new
+
+
+def table_rows(els, op):
+    return [[op[(a, b)] for b in els] for a in els]
+
+
+# ---------- printed Cayley tables ----------
+for name, t in [("U5", U5), ("Z6", Z6), ("U8", U8), ("D3", D3), ("G4", G4)]:
+    els, op = op_from_table(t)
+    g, e = is_group(els, op)
+    ok(f"{name} is a group", g)
+    ok(f"{name} Latin square", latin(els, op))
+
+# printed tables agree with the defining rule
+ok("U5 table = x5", table_rows(*op_from_func(["1", "2", "3", "4"], lambda a, b: str(int(a) * int(b) % 5))) == U5[1])
+ok("U8 table = x8", table_rows(*op_from_func(["1", "3", "5", "7"], lambda a, b: str(int(a) * int(b) % 8))) == U8[1])
+ok("Z6 table = +6", table_rows(*op_from_func([str(i) for i in range(6)], lambda a, b: str((int(a) + int(b)) % 6))) == Z6[1])
+ok("M4 table = x4", table_rows(*op_from_func(["0", "1", "2", "3"], lambda a, b: str(int(a) * int(b) % 4))) == M4[1])
+m4 = op_from_table(M4)
+ok("M4 not a group (inverse fails)", is_group(*m4) == (False, "identity") or is_group(*m4)[0] is False)
+ok("M4 rows of 0 and 2 repeat", not latin(*m4))
+ok("0 and 2 have no inverse mod 4", all(not any(a * b % 4 == 1 for b in range(4)) for a in (0, 2)))
+
+
+# D3 from geometry: permutations of corner positions 0 (top), 1 (bottom left), 2 (bottom right); x o y = do y then x
+def comp(p, q):
+    return tuple(p[q[i]] for i in range(len(q)))
+
+
+rot = lambda k, n: tuple((i + k) % n for i in range(n))  # noqa: E731
+ref = lambda m, n: tuple((m - i) % n for i in range(n))  # noqa: E731
+D3P = dict(zip(D3[0], [rot(0, 3), rot(1, 3), rot(2, 3), ref(0, 3), ref(2, 3), ref(1, 3)]))
+inv = {v: k for k, v in D3P.items()}
+ok("D3 table matches geometry", all(D3[1][i][j] == inv[comp(D3P[a], D3P[b])]
+                                    for i, a in enumerate(D3[0]) for j, b in enumerate(D3[0])))
+ok("a fixes top, b bottom-left, c bottom-right", D3P["a"][0] == 0 and D3P["b"][1] == 1 and D3P["c"][2] == 2)
+ok("r is anticlockwise: top -> bottom-left", D3P["r"][0] == 1)
+
+d3 = op_from_table(D3)
+ok("r o a = c, a o r = b", d3[1][("r", "a")] == "c" and d3[1][("a", "r")] == "b")
+ok("D3 non-abelian", not abelian(*d3))
+ok("D3 orders", {x: order(*d3, x) for x in D3[0]} == {"e": 1, "r": 3, "r²": 3, "a": 2, "b": 2, "c": 2})
+d3subs = subgroups(*d3)
+ok("D3 has 6 subgroups as listed", set(d3subs) == {frozenset(s) for s in
+                                                   [{"e"}, {"e", "a"}, {"e", "b"}, {"e", "c"}, {"e", "r", "r²"}, set(D3[0])]})
+ok("D3 generated by r and a", generated(*d3, ["r", "a"]) == set(D3[0]))
+ok("a o b = r", d3[1][("a", "b")] == "r")
+ok("a o r o a = r2", d3[1][(d3[1][("a", "r")], "a")] == "r²")
+ok("D3 inverses", {x: inverse(*d3, x) for x in D3[0]} == {"e": "e", "r": "r²", "r²": "r", "a": "a", "b": "b", "c": "c"})
+
+u5 = op_from_table(U5)
+ok("U5 orders", {x: order(*u5, x) for x in U5[0]} == {"1": 1, "2": 4, "3": 4, "4": 2})
+ok("U5 powers of 2: 2,4,3,1", [pow(2, k, 5) for k in range(1, 5)] == [2, 4, 3, 1])
+ok("U5 inverses", {x: inverse(*u5, x) for x in U5[0]} == {"1": "1", "2": "3", "3": "2", "4": "4"})
+ok("U5 3 x 4 = 2", u5[1][("3", "4")] == "2")
+ok("U5 subgroup {1,4}", frozenset({"1", "4"}) in subgroups(*u5))
+u8 = op_from_table(U8)
+ok("U8 all non-identity order 2", all(order(*u8, x) == 2 for x in ["3", "5", "7"]))
+ok("U8 generated by 3 and 5", generated(*u8, ["3", "5"]) == set(U8[0]) and u8[1][("3", "5")] == "7")
+z6 = op_from_table(Z6)
+ok("Z6 generators 1 and 5", [x for x in Z6[0] if order(*z6, x) == 6] == ["1", "5"])
+ok("Z6 order of 2 is 3", order(*z6, "2") == 3)
+ok("Z6 subgroups", set(subgroups(*z6)) == {frozenset(s) for s in [{"0"}, {"0", "3"}, {"0", "2", "4"}, set(Z6[0])]})
+ok("{0,1,5} not closed", (1 + 1) % 6 not in {0, 1, 5})
+g4 = op_from_table(G4)
+ok("G4: a*a = b, a has order 4, cyclic", g4[1][("a", "a")] == "b" and order(*g4, "a") == 4)
+ok("G4 inverses e,c,b,a", [inverse(*g4, x) for x in G4[0]] == ["e", "c", "b", "a"])
+ok("G4 printed rows in example text", "row a: a b c e; row b: b c e a; row c: c e a b" in UNIT["examples"][3]["steps"][2])
+
+# ---------- algebraic claims ----------
+a, b, c, x = sp.symbols("a b c x")
+star = lambda p, q: p + q + p * q  # noqa: E731
+ok("a*b = (1+a)(1+b)-1", sp.expand(star(a, b) - ((1 + a) * (1 + b) - 1)) == 0)
+ok("a*b+ab associative", sp.expand(star(star(a, b), c) - star(a, star(b, c))) == 0)
+ok("a*b+ab expansion", sp.expand(star(star(a, b), c) - (a + b + c + a*b + b*c + c*a + a*b*c)) == 0)
+ok("inverse -a/(1+a)", sp.simplify(star(a, -a / (1 + a))) == 0)
+ok("element of order 2 is -2", set(sp.solve(sp.Eq(star(a, a), 0), a)) == {0, -2})
+s2 = lambda p, q: p + q - 3  # noqa: E731
+ok("x+y-3: associative", sp.expand(s2(s2(a, b), c) - s2(a, s2(b, c))) == 0)
+ok("x+y-3: identity 3, inverse 6-a", s2(a, 3) == a and sp.simplify(s2(a, 6 - a)) == 3 and sp.simplify(s2(6 - a, a)) == 3)
+ok("(8-4)-2 = 2, 8-(4-2) = 6", (8 - 4) - 2 == 2 and 8 - (4 - 2) == 6)
+
+# functions x, -x, 1/x, -1/x under composition: group of order 4, each self-inverse
+funcs = [x, -x, 1 / x, -1 / x]
+fidx = lambda e: next(i for i, f in enumerate(funcs) if sp.simplify(e - f) == 0)  # noqa: E731
+fop = op_from_func(range(4), lambda i, j: fidx(funcs[i].subs(x, funcs[j])))
+ok("functions form a group", is_group(*fop)[0])
+ok("functions self-inverse", all(fop[1][(i, i)] == 0 for i in range(4)))
+
+# matrices
+A = sp.Matrix([[0, -1], [1, 0]])
+ok("A = (0 -1; 1 0) has A^4 = I, order 4", A**4 == sp.eye(2) and A**2 != sp.eye(2))
+B = sp.Matrix([[0, -1], [1, -1]])
+ok("practice 11: B^2 = (-1 1; -1 0), B^3 = I", B**2 == sp.Matrix([[-1, 1], [-1, 0]]) and B**3 == sp.eye(2))
+ok("B^-1 = B^2", B.inv() == B**2)
+
+
+# permutations: (1 2)(1 3) = (1 3 2), composition right to left
+def cyc(*c):
+    m = {i: i for i in (1, 2, 3)}
+    for i, v in enumerate(c):
+        m[v] = c[(i + 1) % len(c)]
+    return m
+
+
+prod = {i: cyc(1, 2)[cyc(1, 3)[i]] for i in (1, 2, 3)}
+ok("(1 2)(1 3) = (1 3 2)", prod == cyc(1, 3, 2))
+
+# roots of unity
+w = sp.exp(2 * sp.pi * sp.I / 3)
+ok("w^3 = 1, w^4 = w", sp.simplify(w**3) == 1 and sp.simplify(w**4 - w) == 0)
+ok("order of i is 4, -1 is 2", sp.I**4 == 1 and sp.I**2 != 1 and (-1)**2 == 1)
+
+
+# ---------- example 5: units mod 16 ----------
+def mod_group(els, n):
+    return op_from_func(els, lambda p, q: p * q % n)
+
+
+u16 = mod_group([1, 3, 5, 7, 9, 11, 13, 15], 16)
+ok("U16 is a group", is_group(*u16)[0])
+ok("U16 orders", {x: order(*u16, x) for x in u16[0]} == {1: 1, 3: 4, 5: 4, 7: 2, 9: 2, 11: 4, 13: 4, 15: 2})
+ok("U16 stated powers", (9, 11, 1) == (3**2 % 16, 3**3 % 16, 3**4 % 16) and 25 % 16 == 9 and 81 % 16 == 1
+   and 49 % 16 == 1 and 225 % 16 == 1 and 121 % 16 == 9 and 169 % 16 == 9)
+ok("<3> = {1,3,9,11}", generated(*u16, [3]) == {1, 3, 9, 11})
+ok("{1,7,9,15} subgroup, products", frozenset({1, 7, 9, 15}) in subgroups(*u16)
+   and (63 % 16, 105 % 16, 135 % 16) == (15, 9, 7))
+
+# ---------- practice ----------
+ans = UNIT["answers"]
+ok("P1", [x for x in range(-2, 3)] == [-2, -1, 0, 1, 2] and {1, 2, 3, 4} & set(range(-2, 3)) == {1, 2})
+ok("P2(c) values", (1 * 2 + 1, 3 * 3 + 1, 2 * 3 + 1, 1 * 7 + 1) == (3, 10, 7, 8))
+ok("P2(a) counter", (3 - 2) - 1 == 0 and 3 - (2 - 1) == 2)
+ok("P3", abs(abs(1 - 2) - 3) == 2 and abs(1 - abs(2 - 3)) == 0)
+z10 = op_from_func([0, 2, 4, 6, 8], lambda p, q: (p + q) % 10)
+ok("P4 group, 2 order 5", is_group(*z10)[0] and order(*z10, 2) == 5
+   and all(order(*z10, k) == 5 for k in (2, 4, 6, 8)))
+ok("P4 inverses 2<->8, 4<->6", inverse(*z10, 2) == 8 and inverse(*z10, 4) == 6)
+u12 = mod_group([1, 5, 7, 11], 12)
+ok("P5 group, all order 2", is_group(*u12)[0] and all(order(*u12, k) == 2 for k in (5, 7, 11)))
+ok("P5 table rows", table_rows(*u12) == [[1, 5, 7, 11], [5, 1, 11, 7], [7, 11, 1, 5], [11, 7, 5, 1]])
+g10 = mod_group([2, 4, 6, 8], 10)
+ok("P6 group with identity 6", is_group(*g10) == (True, 6))
+ok("P6 table rows", table_rows(*g10) == [[4, 8, 2, 6], [8, 6, 4, 2], [2, 4, 6, 8], [6, 2, 8, 4]])
+ok("P6 inverses and generators", inverse(*g10, 2) == 8 and inverse(*g10, 4) == 4
+   and [k for k in (2, 4, 6, 8) if order(*g10, k) == 4] == [2, 8])
+ok("P7(a) not closed", 2 * 2 % 4 == 0)
+z8 = op_from_func(range(8), lambda p, q: (p + q) % 8)
+ok("P8 orders", [order(*z8, k) for k in range(8)] == [1, 8, 4, 8, 2, 8, 4, 8])
+ok("P8 subgroups", set(subgroups(*z8)) == {frozenset(s) for s in [{0}, {0, 4}, {0, 2, 4, 6}, set(range(8))]})
+u7 = mod_group(range(1, 7), 7)
+ok("P9 orders", [order(*u7, k) for k in range(1, 7)] == [1, 3, 6, 3, 6, 2])
+ok("P9 subgroups of order 2, 3", [set(h) for h in subgroups(*u7) if len(h) in (2, 3)] == [{1, 6}, {1, 2, 4}])
+ok("P12 divisors of 21", sp.divisors(21) == [1, 3, 7, 21] and 21 % 6 != 0)
+
+# ---------- exam ----------
+u10 = mod_group([1, 3, 7, 9], 10)
+ok("E1 table", table_rows(*u10) == [[1, 3, 7, 9], [3, 9, 1, 7], [7, 1, 9, 3], [9, 7, 3, 1]])
+ok("E1 orders", [order(*u10, k) for k in (1, 3, 7, 9)] == [1, 4, 4, 2])
+ok("E1 inverses", [inverse(*u10, k) for k in (1, 3, 7, 9)] == [1, 7, 3, 9])
+ok("E1 proper subgroups", [set(h) for h in subgroups(*u10) if len(h) < 4] == [{1}, {1, 9}])
+z12 = op_from_func(range(12), lambda p, q: (p + q) % 12)
+ok("E4 order of 8 is 3", order(*z12, 8) == 3)
+ok("E4 generators 1,5,7,11", [k for k in range(12) if order(*z12, k) == 12] == [1, 5, 7, 11])
+ok("E4 six subgroups", sorted(len(h) for h in subgroups(*z12)) == [1, 2, 3, 4, 6, 12])
+ok("E4 union not closed", (4 + 6) % 12 not in {0, 4, 6, 8})
+# dihedral group of order 12 has no element of order 12
+D6 = [rot(k, 6) for k in range(6)] + [ref(m, 6) for m in range(6)]
+d6 = op_from_func(D6, comp)
+ok("D6 group of order 12, non-abelian, not cyclic", is_group(*d6)[0] and not abelian(*d6)
+   and max(order(*d6, g) for g in D6) == 6)
+
+# ---------- Lagrange converse fails: A4 has no subgroup of order 6 ----------
+A4 = [p for p in itertools.permutations(range(4))
+      if sum(1 for i in range(4) for j in range(i + 1, 4) if p[i] > p[j]) % 2 == 0]
+a4 = op_from_func(A4, comp)
+e4 = tuple(range(4))
+has6 = any(all(comp(p, q) in h for p in h for q in h)
+           for comb in itertools.combinations([p for p in A4 if p != e4], 5) for h in [set(comb) | {e4}])
+ok("A4 has order 12 and no subgroup of order 6", len(A4) == 12 and not has6)
+
+# ---------- structure ----------
+ok("practice/answers counts", len(UNIT["practice"]) == len(ans) == 12 and len(UNIT["exam"]) == 4)
+marks = [sum(int(m) for m in re.findall(r"\[(\d+)\]", q)) for q in UNIT["exam"]]
+ok(f"exam marks {marks} within 8-14", all(8 <= m <= 14 for m in marks))
+
+print(f"\n{COUNT - len(FAILS)}/{COUNT} checks passed")
+if FAILS:
+    print("FAILED:", FAILS)
+    sys.exit(1)
+print("pc07: ALL CHECKS PASSED")

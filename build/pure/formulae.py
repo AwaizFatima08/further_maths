@@ -1,0 +1,115 @@
+"""Formula sheet for the back of the Further Pure workbook."""
+
+SECTION = {
+    "title": "Formula sheet",
+    "notes": [
+        ("p", "A summary of the results used in the workbook. Your board's booklet prints some of these; the rest must be "
+              "learnt (see the 'must memorise' notes in each unit). Cambridge's list (MF19) prints the fewest."),
+        ("h2", "Complex numbers"),
+        ("bullets", [
+            "z = x + iy = r(cos θ + i sin θ) = re^(iθ);  |z| = r = √(x² + y²);  z z* = |z|².",
+            "|z₁z₂| = |z₁||z₂|,  arg(z₁z₂) = arg z₁ + arg z₂;  |z₁/z₂| = |z₁|/|z₂|,  arg(z₁/z₂) = arg z₁ − arg z₂.",
+            "De Moivre: [r(cos θ + i sin θ)]ⁿ = rⁿ(cos nθ + i sin nθ).",
+            "If z = e^(iθ): zⁿ + z⁻ⁿ = 2 cos nθ and zⁿ − z⁻ⁿ = 2i sin nθ.",
+            "nth roots of unity: e^(2πik/n), k = 0, 1, …, n − 1; they sum to 0 (n ≥ 2).",
+            "Loci: |z − a| = r (circle);  |z − a| = |z − b| (perpendicular bisector);  arg(z − a) = θ (half-line).",
+        ]),
+        ("h2", "Roots of polynomials"),
+        ("table", ["Equation", "Relations between roots and coefficients"], [
+            ["ax² + bx + c = 0", "α + β = −b/a,  αβ = c/a"],
+            ["ax³ + bx² + cx + d = 0", "Σα = −b/a,  Σαβ = c/a,  αβγ = −d/a"],
+            ["ax⁴ + bx³ + cx² + dx + e = 0", "Σα = −b/a,  Σαβ = c/a,  Σαβγ = −d/a,  αβγδ = e/a"],
+        ]),
+        ("bullets", ["Σα² = (Σα)² − 2Σαβ.  For roots transformed by x → f(x), substitute the inverse into the original equation."]),
+        ("h2", "Series"),
+        ("bullets", [
+            "Σr = ½n(n + 1);  Σr² = ⅙n(n + 1)(2n + 1);  Σr³ = ¼n²(n + 1)²  (sums from r = 1 to n).",
+            "Maclaurin: f(x) = f(0) + x f′(0) + (x²/2!) f″(0) + … + (xʳ/r!) f⁽ʳ⁾(0) + …",
+            "Taylor: f(x) = f(a) + (x − a) f′(a) + ((x − a)²/2!) f″(a) + …",
+            "eˣ = 1 + x + x²/2! + x³/3! + … (all x);  ln(1 + x) = x − x²/2 + x³/3 − … (−1 < x ≤ 1).",
+            "sin x = x − x³/3! + x⁵/5! − …;  cos x = 1 − x²/2! + x⁴/4! − … (all x);  arctan x = x − x³/3 + x⁵/5 − … (|x| ≤ 1).",
+            "(1 + x)ⁿ = 1 + nx + n(n − 1)x²/2! + … (|x| < 1 unless n is a positive integer).",
+            "Leibnitz: dⁿ(uv)/dxⁿ = Σ C(n, r) u⁽ʳ⁾ v⁽ⁿ⁻ʳ⁾, r = 0 to n.",
+        ]),
+        ("h2", "Matrices"),
+        ("bullets", [
+            "For M = (a b; c d): det M = ad − bc and M⁻¹ = (1/(ad − bc)) (d −b; −c a).",
+            "(AB)⁻¹ = B⁻¹A⁻¹;  det(AB) = det A × det B;  AB means 'B first, then A'.",
+            "Rotation by θ anticlockwise about O: (cos θ −sin θ; sin θ cos θ).  Reflection in y = x tan θ: (cos 2θ sin 2θ; sin 2θ −cos 2θ).",
+            "Rotation by θ about the z-axis: (cos θ −sin θ 0; sin θ cos θ 0; 0 0 1)  (similarly for the x- and y-axes).",
+            "Eigenvalues: det(A − λI) = 0.  Diagonalisation: A = PDP⁻¹, so Aⁿ = PDⁿP⁻¹. For symmetric A, P can be orthogonal (P⁻¹ = Pᵀ).",
+            "Cayley–Hamilton: every square matrix satisfies its own characteristic equation.",
+        ]),
+        ("h2", "Vectors"),
+        ("bullets", [
+            "Line: r = a + λb, or (x − a₁)/b₁ = (y − a₂)/b₂ = (z − a₃)/b₃, or (r − a) × b = 0.",
+            "Plane: r · n = p, ax + by + cz = d, (r − a) · n = 0, or r = a + λb + μc.",
+            "a · b = |a||b| cos θ;  a × b = (a₂b₃ − a₃b₂, a₃b₁ − a₁b₃, a₁b₂ − a₂b₁), with |a × b| = |a||b| sin θ.",
+            "Triangle area ½|a × b|;  parallelepiped volume |a · (b × c)|;  tetrahedron volume ⅙|a · (b × c)|.",
+            "Angle θ between a line (direction b) and a plane (normal n): sin θ = |b · n| / (|b||n|).",
+            "Distance from (α, β, γ) to ax + by + cz = d: |aα + bβ + cγ − d| / √(a² + b² + c²).",
+            "Shortest distance between skew lines r = a + λb, r = c + μd: |(c − a) · (b × d)| / |b × d|.",
+        ]),
+        ("h2", "Hyperbolic functions"),
+        ("bullets", [
+            "cosh x = (eˣ + e⁻ˣ)/2;  sinh x = (eˣ − e⁻ˣ)/2;  tanh x = sinh x / cosh x.",
+            "cosh²x − sinh²x = 1;  sinh 2x = 2 sinh x cosh x;  cosh 2x = cosh²x + sinh²x;  sech²x = 1 − tanh²x.",
+            "arsinh x = ln(x + √(x² + 1));  arcosh x = ln(x + √(x² − 1)), x ≥ 1;  artanh x = ½ ln((1 + x)/(1 − x)), |x| < 1.",
+        ]),
+        ("h2", "Differentiation and integration"),
+        ("table", ["f(x)", "f′(x)", "f(x)", "∫ f(x) dx"], [
+            ["sinh x", "cosh x", "1/√(a² − x²)", "arcsin(x/a)  (|x| < a)"],
+            ["cosh x", "sinh x", "1/(a² + x²)", "(1/a) arctan(x/a)"],
+            ["tanh x", "sech²x", "1/√(x² + a²)", "arsinh(x/a) = ln(x + √(x² + a²))"],
+            ["arcsin x", "1/√(1 − x²)", "1/√(x² − a²)", "arcosh(x/a) = ln(x + √(x² − a²))  (x > a)"],
+            ["arccos x", "−1/√(1 − x²)", "1/(a² − x²)", "(1/(2a)) ln|(a + x)/(a − x)|"],
+            ["arctan x", "1/(1 + x²)", "sinh x", "cosh x"],
+            ["arsinh x", "1/√(x² + 1)", "cosh x", "sinh x"],
+            ["arcosh x", "1/√(x² − 1)", "tanh x", "ln cosh x"],
+            ["artanh x", "1/(1 − x²)", "sech²x", "tanh x"],
+        ]),
+        ("bullets", [
+            "t-substitution, t = tan(x/2): sin x = 2t/(1 + t²), cos x = (1 − t²)/(1 + t²), tan x = 2t/(1 − t²), dx = 2 dt/(1 + t²).",
+            "Parametric: d²y/dx² = (d/dt)(dy/dx) ÷ (dx/dt).",
+        ]),
+        ("h2", "Applications of integration"),
+        ("bullets", [
+            "Volume of revolution: V = π∫y² dx (about the x-axis), V = π∫x² dy (about the y-axis); parametric V = π∫y² (dx/dt) dt.",
+            "Mean value of f on [a, b]: (1/(b − a)) ∫ₐᵇ f(x) dx.",
+            "Arc length: s = ∫√(1 + (dy/dx)²) dx = ∫√((dx/dt)² + (dy/dt)²) dt = ∫√(r² + (dr/dθ)²) dθ.",
+            "Surface area of revolution about the x-axis: S = 2π∫y ds.",
+            "Polar: x = r cos θ, y = r sin θ;  area = ½∫r² dθ.  Tangent parallel to the initial line where d(r sin θ)/dθ = 0; "
+            "perpendicular where d(r cos θ)/dθ = 0.",
+        ]),
+        ("h2", "Differential equations"),
+        ("bullets", [
+            "dy/dx + P(x)y = Q(x): integrating factor e^(∫P dx), then (d/dx)(y × IF) = Q × IF.",
+            "a y″ + b y′ + c y = f(x): auxiliary equation am² + bm + c = 0.  Real distinct roots: y = Ae^(m₁x) + Be^(m₂x).  "
+            "Repeated root m: y = (A + Bx)e^(mx).  Complex roots p ± qi: y = e^(px)(A cos qx + B sin qx).  General solution = CF + PI.",
+            "Simple harmonic motion: ẍ = −ω²x, x = A cos ωt + B sin ωt = R sin(ωt + φ), period 2π/ω.",
+        ]),
+        ("h2", "Numerical methods"),
+        ("bullets", [
+            "Newton–Raphson: xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ).",
+            "Mid-ordinate rule: ∫ₐᵇ y dx ≈ h(y_½ + y_(3/2) + … + y_(n−½)), h = (b − a)/n.",
+            "Simpson's rule (n even): ∫ₐᵇ y dx ≈ (h/3)[y₀ + yₙ + 4(y₁ + y₃ + … + yₙ₋₁) + 2(y₂ + y₄ + … + yₙ₋₂)].",
+            "Euler: yᵣ₊₁ = yᵣ + h f(xᵣ, yᵣ).  Improved Euler (AQA J3): yᵣ₊₁ = yᵣ₋₁ + 2h f(xᵣ, yᵣ), with xᵣ₊₁ = xᵣ + h.",
+            "Finite differences: (dy/dx)₀ ≈ (y₁ − y₋₁)/(2h);  (d²y/dx²)₀ ≈ (y₁ − 2y₀ + y₋₁)/h².",
+        ]),
+        ("h2", "Conics"),
+        ("table", ["Curve", "Equation", "Parametric form", "Foci and directrices"], [
+            ["Parabola", "y² = 4ax", "(at², 2at)", "focus (a, 0), directrix x = −a"],
+            ["Rectangular hyperbola", "xy = c²", "(ct, c/t)", "foci (c√2, c√2) and (−c√2, −c√2)"],
+            ["Ellipse", "x²/a² + y²/b² = 1, b² = a²(1 − e²)", "(a cos θ, b sin θ)", "foci (±ae, 0), directrices x = ±a/e"],
+            ["Hyperbola", "x²/a² − y²/b² = 1, b² = a²(e² − 1)", "(a cosh t, b sinh t) or (a sec θ, b tan θ)", "foci (±ae, 0), directrices x = ±a/e"],
+        ]),
+        ("h2", "Further Pure options"),
+        ("bullets", [
+            "Recurrence uₙ₊₁ = a uₙ + b (a ≠ 1): uₙ = Aaⁿ + b/(1 − a).  uₙ₊₂ = p uₙ₊₁ + q uₙ: solve m² = pm + q as for differential equations.",
+            "Fermat's little theorem: if p is prime and p ∤ a, then a^(p−1) ≡ 1 (mod p).",
+            "Lagrange's theorem: the order of a subgroup divides the order of the group.",
+            "Surfaces z = f(x, y): stationary where f_x = f_y = 0; with H = f_xx f_yy − (f_xy)², H > 0 and f_xx > 0 gives a minimum, "
+            "H > 0 and f_xx < 0 a maximum, H < 0 a saddle point.  Tangent plane at (a, b): z − f(a, b) = f_x(a, b)(x − a) + f_y(a, b)(y − b).",
+        ]),
+    ],
+}

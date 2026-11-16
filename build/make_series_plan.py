@@ -1,16 +1,14 @@
-"""Writes the YouTube lecture series plan (Markdown) from the workbook units, so episode
-references to sections and worked examples always match the book."""
+"""Writes a YouTube lecture series plan (Markdown) from the workbook units, so episode
+references to sections and worked examples always match the book.
+
+Usage: python make_series_plan.py [stats|pure]   (default stats)
+"""
 import importlib
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parent / "YouTube_Lecture_Series_Plan.md"
 sys.path.insert(0, str(HERE))
-
-from content import book  # noqa: E402
-
-BOARD_NAMES = dict(zip(book.BOARDS, ["Edexcel", "IAL S3", "AQA", "OCR A", "OCR MEI", "Cambridge 9231"]))
 
 # (module, episode title, section numbers (1-based within the unit), worked example numbers, minutes, focus line)
 EPISODES = [
@@ -140,13 +138,52 @@ def h2s(unit):
     return [n[1] for n in unit["notes"] if n[0] == "h2"]
 
 
-def boards_for(module):
+LABELS = {"AS": "AS", "A": "A level", "S3": "S3", "P4": "Paper 4", "P": "prior knowledge", "pre": "prior knowledge",
+          "opt": "option", "P1": "Paper 1", "P2": "Paper 2"}
+BOARD_DISPLAY = {"IAL S3": "IAL S3", "IAL": "IAL", "CAIE 9231": "Cambridge 9231"}
+
+
+def config(name):
+    """Everything that differs between the statistics and pure series."""
+    if name == "pure":
+        import series_pure
+        return {
+            "book": importlib.import_module("pure.book"), "package": "pure",
+            "episodes": series_pure.EPISODES, "specials": series_pure.SPECIALS,
+            "special_after": series_pure.SPECIAL_AFTER,
+            "parts": [("pa", "Part A: AS Core Pure"), ("pb", "Part B: A2 Core Pure"), ("pc", "Part C: Further Pure options")],
+            "out": HERE.parent / "YouTube_Pure_Lecture_Series_Plan.md",
+            "subject": "Pure", "workbook": "Further_Pure_Workbook.pdf",
+            "parts_line": "Part A (AS Core Pure), Part B (A2 Core Pure) and Part C (Further Pure options) follow the workbook's order.",
+            "symbols": "θ, π, λ, ∫, Σ, √",
+            "verified": "SymPy",
+            "playlists": "'Further Pure: complete course' (all episodes in order), 'AS Core Pure', 'A2 Core Pure', "
+                         "'Further Pure options', and one playlist per board (built from the 'Exam boards' line of each card).",
+            "title_example": "`De Moivre's Theorem | A Level Further Maths Pure | Ep 25`",
+            "badge": "an 'AS', 'A2' or 'Option' badge",
+        }
+    return {
+        "book": importlib.import_module("content.book"), "package": "content",
+        "episodes": EPISODES, "specials": SPECIALS, "special_after": {"as": "as_review", "a2": "a2_review"},
+        "parts": [("as", "Part A: AS"), ("a2", "Part B: A2")],
+        "out": HERE.parent / "YouTube_Lecture_Series_Plan.md",
+        "subject": "Statistics", "workbook": "Further_Statistics_Workbook.pdf",
+        "parts_line": "Part A (AS) and Part B (A2) follow the workbook's order.",
+        "symbols": "μ, σ, λ, χ²",
+        "verified": "SciPy",
+        "playlists": "'Further Statistics: complete course' (all episodes in order), 'AS Further Statistics', "
+                     "'A2 Further Statistics', and one playlist per board (built from the 'Exam boards' line of each card).",
+        "title_example": "`The Geometric Distribution | A Level Further Maths Statistics | Ep 6`",
+        "badge": "an 'AS' or 'A2' badge",
+    }
+
+
+def boards_for(book, module):
     row = next(c for m, _, c in book.COVERAGE if m == module)
-    labels = {"AS": "AS", "A": "A level", "S3": "S3", "P4": "Paper 4", "P": "prior knowledge"}
-    return ", ".join(f"{BOARD_NAMES[b]} ({labels[v]})" for b, v in zip(book.BOARDS, row) if v)
+    return ", ".join(f"{BOARD_DISPLAY.get(b, b)} ({LABELS.get(v, v)})" for b, v in zip(book.BOARDS, row) if v)
 
 
-def episode_block(n, module, title, sections, examples, minutes, focus, unit):
+def episode_block(n, book, module, title, sections, examples, minutes, focus, unit):
     heads = h2s(unit)
     sections = sections or list(range(1, len(heads) + 1))
     examples = examples or list(range(1, len(unit["examples"]) + 1))
@@ -154,11 +191,11 @@ def episode_block(n, module, title, sections, examples, minutes, focus, unit):
     ex_titles = [f"Example {unit['number']}.{i} ({unit['examples'][i - 1]['title']})" for i in examples]
     teach = max(6, round(minutes * 0.38))
     work = max(6, round(minutes * 0.36))
-    lines = [
+    return [
         f"### Episode {n}: {title}",
         "",
         f"- **Length:** {minutes} min  ·  **Workbook:** Unit {unit['number']} ({unit['title']})",
-        f"- **Exam boards:** {boards_for(module)}",
+        f"- **Exam boards:** {boards_for(book, module)}",
         f"- **In one sentence:** {focus}",
         f"- **Sections taught:** " + "; ".join(sec_titles),
         f"- **Worked examples on screen:** " + "; ".join(ex_titles),
@@ -173,47 +210,50 @@ def episode_block(n, module, title, sections, examples, minutes, focus, unit):
         f"| {minutes - 2}:00–{minutes}:00 | Summary of key results, homework (Unit {unit['number']} practice on these sections), next episode |",
         "",
     ]
-    return lines
 
 
-def special_block(n, key):
-    title, minutes, points = SPECIALS[key]
+def special_block(n, special):
+    title, minutes, points = special
     lines = [f"### Episode {n}: {title}", "", f"- **Length:** {minutes} min  ·  **Type:** overview / exam technique", ""]
     lines += [f"- {p}" for p in points]
     return lines + [""]
 
 
 def main():
-    units = {}
-    missing = []
+    cfg = config(sys.argv[1] if len(sys.argv) > 1 else "stats")
+    book, specials = cfg["book"], cfg["specials"]
+    units, missing = {}, []
     for m, _, _ in book.COVERAGE:
         try:
-            units[m] = importlib.import_module(f"content.{m}").UNIT
+            units[m] = importlib.import_module(f"{cfg['package']}.{m}").UNIT
         except ModuleNotFoundError:
             missing.append(m)
 
+    # Episode order: intro, then each part's episodes, with a review episode after the parts that have one.
     episodes = [("special", "intro")]
-    episodes += [("ep", e) for e in EPISODES if e[0].startswith("as")]
-    episodes.append(("special", "as_review"))
-    episodes += [("ep", e) for e in EPISODES if e[0].startswith("a2")]
-    episodes.append(("special", "a2_review"))
-    episodes = [e for e in episodes if e[0] == "special" or e[1][0] in units]
+    for prefix, _ in cfg["parts"]:
+        episodes += [("ep", e) for e in cfg["episodes"] if e[0].startswith(prefix) and e[0] in units]
+        if prefix in cfg["special_after"]:
+            episodes.append(("special", cfg["special_after"][prefix]))
+    covered = {e[0] for e in cfg["episodes"]}
+    uncovered = [m for m in units if m not in covered]
 
-    total_min = sum(SPECIALS[e[1]][1] if e[0] == "special" else e[1][4] for e in episodes)
+    subject = cfg["subject"]
+    total_min = sum(specials[e[1]][1] if e[0] == "special" else e[1][4] for e in episodes)
     out = [
-        "# Further Mathematics Statistics: YouTube lecture series plan",
+        f"# Further Mathematics {subject}: YouTube lecture series plan",
         "",
-        "A complete lecture series built on the workbook *Further Mathematics: Statistics* "
-        "(`Further_Statistics_Workbook.pdf`). Each video teaches **one topic** in **20–30 minutes** and maps to named "
+        f"A complete lecture series built on the workbook *Further Mathematics: {subject}* "
+        f"(`{cfg['workbook']}`). Each video teaches **one topic** in **20–30 minutes** and maps to named "
         "sections and worked examples of the workbook, so students can pause, work along and practise.",
         "",
         f"**Size:** {len(episodes)} episodes, about {total_min // 60} hours {total_min % 60} minutes in total. "
-        "Part A (AS) and Part B (A2) follow the workbook's order.",
+        + cfg["parts_line"],
         "",
         "## 1. Audience and promise",
         "",
         "- A-level Further Mathematics students on any board: Edexcel, IAL, AQA, OCR A, OCR MEI or Cambridge 9231.",
-        "- Promise to viewers: every Further Statistics topic, taught from first principles to exam standard, with a free "
+        f"- Promise to viewers: every Further {subject} topic, taught from first principles to exam standard, with a free "
         "workbook to practise from.",
         "- Each episode lists its exam boards, so students can skip what their board does not examine.",
         "",
@@ -234,24 +274,22 @@ def main():
         "the single source of truth, so numbers on screen always match the answers).",
         "2. **Slides / board:** one slide per boxed result; worked examples written live (tablet) so viewers see the method.",
         "3. **Record** in chapters matching the run sheet; re-record a chapter rather than patching a single line.",
-        "4. **Check** every number on screen against the workbook before publishing (the workbook's values were verified with SciPy).",
+        f"4. **Check** every number on screen against the workbook before publishing (the workbook's results were verified with {cfg['verified']}).",
         "5. **Edit:** add YouTube chapters from the run sheet times, captions (auto-captions corrected for symbols such as "
-        "μ, σ, λ, χ²), and an end screen linking the next episode.",
+        f"{cfg['symbols']}), and an end screen linking the next episode.",
         "6. **Publish** with the description template below and add to the playlists.",
         "",
         "## 4. Playlists and release schedule",
         "",
-        "- **Playlists:** 'Further Statistics: complete course' (all episodes in order), 'AS Further Statistics', "
-        "'A2 Further Statistics', and one playlist per board (built from the 'Exam boards' line of each card).",
-        "- **Release:** two episodes a week takes about six months for the full series. Releasing the AS episodes first "
-        "lets Year 12 students follow along during the school year.",
+        f"- **Playlists:** {cfg['playlists']}",
+        f"- **Release:** two episodes a week takes about {round(len(episodes) / 2 / 4.3)} months for the full series. "
+        "Releasing the AS episodes first lets Year 12 students follow along during the school year.",
         "- **Batch recording:** record one unit's episodes together (same slides and examples), then edit and release in order.",
         "",
         "## 5. Titles, thumbnails and descriptions",
         "",
-        "- **Title pattern:** `<Topic> | A Level Further Maths Statistics | Ep <n>`, e.g. "
-        "`The Geometric Distribution | A Level Further Maths Statistics | Ep 6`.",
-        "- **Thumbnail:** topic name in large type, the key formula, an 'AS' or 'A2' badge and the episode number; one "
+        f"- **Title pattern:** `<Topic> | A Level Further Maths {subject} | Ep <n>`, e.g. {cfg['title_example']}.",
+        f"- **Thumbnail:** topic name in large type, the key formula, {cfg['badge']} and the episode number; one "
         "consistent colour scheme for the whole series.",
         "- **Description template:** one-paragraph summary · chapter timestamps · exam boards covered · workbook unit and "
         "page reference · link to the workbook · links to the previous and next episodes.",
@@ -259,34 +297,30 @@ def main():
         "## 6. Episode guide",
         "",
     ]
-    n = 0
-    part_heading_done = set()
+    part_names = dict(cfg["parts"])
+    n, seen = 0, set()
     for kind, item in episodes:
         if kind == "ep":
-            part = "Part A: AS" if item[0].startswith("as") else "Part B: A2"
-            if part not in part_heading_done:
-                out += [f"## {part}", ""]
-                part_heading_done.add(part)
-        out += special_block(n, item) if kind == "special" else episode_block(n, *item, units[item[0]])
+            prefix = next(p for p in part_names if item[0].startswith(p))
+            if prefix not in seen:
+                out += [f"## {part_names[prefix]}", ""]
+                seen.add(prefix)
+            out += episode_block(n, book, *item, units[item[0]])
+        else:
+            out += special_block(n, specials[item])
         n += 1
-    out += [
-        "## 7. Summary table",
-        "",
-        "| Ep | Title | Workbook unit | Minutes |",
-        "|---|---|---|---|",
-    ]
-    n = 0
-    for kind, item in episodes:
+    out += ["## 7. Summary table", "", "| Ep | Title | Workbook unit | Minutes |", "|---|---|---|---|"]
+    for n, (kind, item) in enumerate(episodes):
         if kind == "special":
-            title, minutes, _ = SPECIALS[item]
+            title, minutes, _ = specials[item]
             out.append(f"| {n} | {title} | – | {minutes} |")
         else:
             out.append(f"| {n} | {item[1]} | {units[item[0]]['number']} | {item[4]} |")
-        n += 1
     if missing:
         out += ["", f"_Units not yet written when this plan was generated: {', '.join(missing)}._"]
-    OUT.write_text("\n".join(out) + "\n")
-    print("wrote", OUT, len(episodes), "episodes", total_min, "minutes", "missing:", missing)
+    cfg["out"].write_text("\n".join(out) + "\n")
+    print("wrote", cfg["out"], len(episodes), "episodes", total_min, "minutes",
+          "missing:", missing, "units without an episode:", uncovered)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 """Builds a PDF of one or more units, for checking layout while writing.
 
-Usage: python preview_unit.py <output.pdf> <module> [<module> ...]   e.g. preview_unit.py /tmp/x.pdf as01 as02
+Usage: python preview_unit.py [--pure] <output.pdf> <module> [<module> ...]
+  e.g. preview_unit.py /tmp/x.pdf as01 as02      (statistics units in content/)
+       preview_unit.py --pure /tmp/x.pdf c01      (pure units in pure/)
 Also validates each unit's structure and fails loudly on a problem.
 """
 import importlib
@@ -11,7 +13,7 @@ from reportlab.lib.units import mm
 
 import build_workbook as bw
 
-NOTE_KINDS = {"h2", "p", "bullets", "box", "warn", "table"}
+NOTE_KINDS = {"h2", "p", "bullets", "box", "warn", "table", "figure"}
 
 
 def validate(name, unit):
@@ -31,10 +33,14 @@ def validate(name, unit):
 
 
 def main():
-    out, names = sys.argv[1], sys.argv[2:]
+    args = sys.argv[1:]
+    if args and args[0] == "--pure":
+        bw.PACKAGE = "pure"
+        args = args[1:]
+    out, names = args[0], args[1:]
     units, story = [], []
     for name in names:
-        unit = importlib.import_module(f"content.{name}").UNIT
+        unit = importlib.import_module(f"{bw.PACKAGE}.{name}").UNIT
         validate(name, unit)
         units.append(unit)
         story += bw.build_unit(unit)

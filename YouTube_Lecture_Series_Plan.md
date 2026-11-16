@@ -26,14 +26,14 @@ A complete lecture series built on the workbook *Further Mathematics: Statistics
 1. **Script** from the workbook sections and examples listed in the episode card (no new content: the book is the single source of truth, so numbers on screen always match the answers).
 2. **Slides / board:** one slide per boxed result; worked examples written live (tablet) so viewers see the method.
 3. **Record** in chapters matching the run sheet; re-record a chapter rather than patching a single line.
-4. **Check** every number on screen against the workbook before publishing (the workbook's values were verified with SciPy).
+4. **Check** every number on screen against the workbook before publishing (the workbook's results were verified with SciPy).
 5. **Edit:** add YouTube chapters from the run sheet times, captions (auto-captions corrected for symbols such as μ, σ, λ, χ²), and an end screen linking the next episode.
 6. **Publish** with the description template below and add to the playlists.
 
 ## 4. Playlists and release schedule
 
 - **Playlists:** 'Further Statistics: complete course' (all episodes in order), 'AS Further Statistics', 'A2 Further Statistics', and one playlist per board (built from the 'Exam boards' line of each card).
-- **Release:** two episodes a week takes about six months for the full series. Releasing the AS episodes first lets Year 12 students follow along during the school year.
+- **Release:** two episodes a week takes about 6 months for the full series. Releasing the AS episodes first lets Year 12 students follow along during the school year.
 - **Batch recording:** record one unit's episodes together (same slides and examples), then edit and release in order.
 
 ## 5. Titles, thumbnails and descriptions
